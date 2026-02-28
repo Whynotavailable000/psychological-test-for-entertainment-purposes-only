@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>人格心理测试</title>
+
+<style>
+body {
+  font-family: "Segoe UI","PingFang SC",sans-serif;
+  background: linear-gradient(135deg, #1a1f3c, #0f1220);
+  color: #fff;
+  text-align: center;
+  padding: 40px;
+}
+
+h1 { font-size: 36px; margin-bottom: 8px; }
+h2 { font-size: 24px; margin: 12px 0; }
+
+#progress { color: #9aa4ff; margin-bottom: 8px; }
+
+.bar {
+  width: 300px;
+  height: 6px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 auto 40px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+#bar-inner {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6a5cff, #4f6bff);
+  transition: width 0.3s ease;
+}
+
+#options {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+button {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 14px 22px;
+  font-size: 16px;
+  background: linear-gradient(135deg, #4f6bff, #6a5cff);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(79,107,255,0.35);
+}
+
+.card {
+  max-width: 460px;
+  margin: 60px auto;
+  padding: 40px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 22px;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+}
+
+.hint { color: #8ea0ff; }
+.footnote { margin-top: 18px; font-size: 12px; color: #aaa; }
+
+.result-item {
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 14px;
+  animation: pop 0.5s ease;
+}
+
+.result-item.main {
+  border: 2px solid #ffd166;
+}
+
+.result-item.special {
+  border: 2px dashed #6a5cff;
+}
+
+@keyframes pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+</style>
+</head>
+
+<body>
+
+<h1>人格心理测试</h1>
+<p id="progress"></p>
+<div class="bar"><div id="bar-inner"></div></div>
+
+<h2 id="question"></h2>
+<div id="options"></div>
+
+<script>
+/* ========= 状态 ========= */
+let index = 0;
+let userGender = null;
+let specialResults = [];
+
+/* ========= 权重 ========= */
+const weights = {
+  魔丸: 1,
+  招笑: 1,
+  joker: 1,
+  不可名状: 1,
+  正常人: 1
+};
+
+/* ========= 结果文案 ========= */
+const personalities = {
+  魔丸:{ text:"你是【魔丸】" },
+  招笑:{ text:"你是【招笑型人格】" },
+  joker:{ text:"你是【joker】" },
+  不可名状:{ text:"你是【不可名状的恐怖】" },
+  正常人:{ text:"你是【正常人】" },
+
+  帅哥:{ text:"你是【大帅哥】" },
+  美女:{ text:"你是【大美女】" },
+  很有眼光的人:{ text:"你是【很有眼光的人】" },
+  鼠目寸光:{ text:"你是【鼠目寸光，嫉妒哥帅气的人】" },
+  su:{ text:"你是【俗】，我就知道你会选美术。如果不是就当没看到，重新去玩一遍，别选美术" }
+};
+
+/* ========= 问题 ========= */
+const questions = [
+ { q:"你的性别是",
+    a:[
+      {t:"男", w:{魔丸:1,joker:1}, g:"male"},
+      {t:"女", w:{招笑:2}, g:"female"},
+      {t:"看情况", w:{joker:1}, s:"eye"},
+      {t:"其它", w:{joker:1}, s:"eye"}
+    ]},
+ { q:"你更喜欢独处还是社交？",
+    a:[
+      {t:"独处", w:{魔丸:1,joker:1}},
+      {t:"社交", w:{招笑:2}},
+      {t:"看情况", w:{joker:1}}
+    ]},
+  { q:"你做决定更依赖？",
+    a:[
+      {t:"逻辑", w:{魔丸:1}},
+      {t:"感觉", w:{招笑:2}},
+      {t:"运气", w:{joker:2}}
+    ]},
+  { q:"压力大时你会？",
+    a:[
+      {t:"冷静分析", w:{魔丸:2}},
+      {t:"情绪爆发", w:{不可名状:2}},
+      {t:"摆烂", w:{joker:2}}
+    ]},
+  { q:"朋友评价你最多的是？",
+    a:[
+      {t:"靠谱", w:{魔丸:1}},
+      {t:"情绪化", w:{招笑:2}},
+      {t:"奇怪", w:{joker:2}}
+    ]},
+  { q:"你更讨厌？",
+    a:[
+      {t:"混乱", w:{魔丸:2}},
+      {t:"冷漠", w:{招笑:2}},
+      {t:"规则", w:{joker:2}}
+    ]},
+  { q:"你通常几点睡？",
+    a:[
+      {t:"规律", w:{魔丸:1}},
+      {t:"很晚", w:{不可名状:2}},
+      {t:"随机", w:{joker:2}}
+    ]},
+  { q:"你更容易被什么影响？",
+    a:[
+      {t:"事实", w:{魔丸:2}},
+      {t:"他人情绪", w:{招笑:2}},
+      {t:"当下心情", w:{joker:2}}
+    ]},
+  { q:"你对未来的态度？",
+    a:[
+      {t:"有规划", w:{魔丸:2}},
+      {t:"顺其自然", w:{joker:2}},
+      {t:"焦虑", w:{不可名状:2}}
+    ]},
+  { q:"你更像？",
+    a:[
+      {t:"观察者", w:{魔丸:2}},
+      {t:"参与者", w:{招笑:2}},
+      {t:"破坏者", w:{joker:2}}
+    ]},
+  { q:"遇到冲突你会？",
+    a:[
+      {t:"沟通解决", w:{魔丸:2}},
+      {t:"情绪对抗", w:{不可名状:2}},
+      {t:"消失", w:{joker:2}}
+    ]},
+  { q:"你更信任？",
+    a:[
+      {t:"自己", w:{魔丸:1}},
+      {t:"他人", w:{招笑:1}},
+      {t:"没人", w:{不可名状:2}}
+    ]},
+  { q:"你对规则的态度？",
+    a:[
+      {t:"遵守", w:{魔丸:2}},
+      {t:"挑战", w:{不可名状:2}},
+      {t:"无所谓", w:{joker:2}}
+    ]},
+  { q:"你最常想的是？",
+    a:[
+      {t:"解决问题", w:{魔丸:2}},
+      {t:"关系感受", w:{招笑:2}},
+      {t:"奇怪想法", w:{joker:2}}
+    ]},
+  { q:"你更害怕？",
+    a:[
+      {t:"失控", w:{魔丸:2}},
+      {t:"被忽视", w:{招笑:2}},
+      {t:"无聊", w:{joker:2}}
+    ]},
+  { q:"你觉得自己？",
+    a:[
+      {t:"很正常", w:{魔丸:1}},
+      {t:"情绪复杂", w:{招笑:1}},
+      {t:"不太对劲", w:{不可名状:2}}
+    ]},
+   { q:"你寒假作业写完了吗？",
+    a:[
+      {t:"写完了", w:{正常人:4}},
+      {t:"一部分", w:{招笑:1}},
+      {t:"没动", w:{不可名状:2}}
+    ]} ,
+   { q:"你有信心写完吗",
+    a:[
+      {t:"有", w:{正常人:4}},
+      {t:"没有", w:{joker:3}},
+      {t:"不知道", w:{不可名状:2}}
+    ]} ,
+  { q:"你认为该程序的编写者帅吗",
+    a:[
+      {t:"帅气", w:{正常人:4}},
+      {t:"非常帅", w:{正常人:4}},
+      {t:"宇宙超级无敌帅", special:"handsome"},
+      {t:"不太对劲", special:"holyshit"},
+      {t:"不作评价"}
+    ]},
+   { q:"你最喜欢的科目是？",
+    a:[
+      {t:"骂死", w:{正常人:6}},
+      {t:"看么丝锥", w:{正常人:9}},
+      {t:"飞择克斯", w:{正常人:6}},
+      {t:"拆尼斯"},
+      {t:"英格力士"},
+      {t:"嗨死透瑞"},
+      {t:"剖里提克斯"},
+      {t:"美术", special:"su"},
+    ]} 
+];
+
+/* ========= 渲染 ========= */
+function render(){
+  const q = questions[index];
+  document.getElementById("question").innerText = q.q;
+  document.getElementById("progress").innerText = `第 ${index+1} / ${questions.length} 题`;
+  document.getElementById("bar-inner").style.width = ((index+1)/questions.length*100)+"%";
+
+  const box = document.getElementById("options");
+  box.innerHTML = "";
+
+  q.a.forEach(opt=>{
+    const b = document.createElement("button");
+    b.innerText = opt.t;
+    b.onclick = ()=>choose(opt);
+    box.appendChild(b);
+  });
+}
+
+function choose(opt){
+  if(opt.g) userGender = opt.g;
+  if(opt.s === "eye") specialResults.push("很有眼光的人");
+
+  if(opt.special === "handsome"){
+    specialResults.push(userGender === "female" ? "美女" : "帅哥");
+  }
+  if(opt.special === "holyshit"){
+    specialResults.push("鼠目寸光");
+  }
+  if(opt.special === "su"){
+    specialResults.push("su");
+  }
+
+  if(opt.w){
+    for(let k in opt.w){
+      weights[k] += opt.w[k];
+    }
+  }
+
+  index++;
+  index < questions.length ? render() : analyzing();
+}
+
+/* ========= 假分析 ========= */
+function analyzing(){
+  document.body.innerHTML = `
+    <h1>分析中…</h1>
+    <p class="hint">正在匹配人格模型</p>
+    <div class="bar"><div id="bar-inner"></div></div>
+  `;
+  let p = 0;
+  const bar = document.getElementById("bar-inner");
+  const timer = setInterval(()=>{
+    p += 2;
+    bar.style.width = p+"%";
+    if(p >= 100){
+      clearInterval(timer);
+      setTimeout(showResult, 400);
+    }
+  },30);
+}
+
+/* ========= 最终结果 ========= */
+function showResult(){
+  const results = [];
+  const main = weightedRandom(weights);
+  results.push({key: main, type:"main"});
+
+  specialResults.forEach(k=>{
+    if(!results.find(r=>r.key===k)){
+      results.push({key:k, type:"special"});
+    }
+  });
+
+  document.body.innerHTML = `
+    <div class="card">
+      <h1>分析完成</h1>
+      <p class="hint">人格模型匹配成功</p>
+      <div id="result-box"></div>
+      <p class="footnote">（结果仅供参考，娱乐用途，请勿当真）</p>
+      <p class="footnote">不感谢参与，下次别再来了</p>
+    </div>
+  `;
+
+  const box = document.getElementById("result-box");
+  results.forEach(r=>{
+    const p = personalities[r.key];
+    if(!p) return;
+    const div = document.createElement("div");
+    div.className = "result-item " + r.type;
+    div.innerHTML = `<h2>${p.text}</h2>`;
+    box.appendChild(div);
+  });
+}
+
+function weightedRandom(obj){
+  let sum = 0;
+  for(let k in obj) sum += obj[k];
+  let r = Math.random() * sum;
+  for(let k in obj){
+    r -= obj[k];
+    if(r <= 0) return k;
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
